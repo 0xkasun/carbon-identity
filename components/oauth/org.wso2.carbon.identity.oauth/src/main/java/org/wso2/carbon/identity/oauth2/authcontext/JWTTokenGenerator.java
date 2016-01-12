@@ -35,9 +35,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.base.MultitenantConstants;
 import org.wso2.carbon.core.util.KeyStoreManager;
-import org.wso2.carbon.identity.core.model.OAuthAppDO;
+import org.wso2.carbon.identity.oauth.dao.OAuthAppDO;
 import org.wso2.carbon.identity.core.util.IdentityCoreConstants;
-import org.wso2.carbon.identity.oauth.cache.CacheKey;
+import org.wso2.carbon.identity.core.util.IdentityUtil;
 import org.wso2.carbon.identity.oauth.common.exception.InvalidOAuthClientException;
 import org.wso2.carbon.identity.oauth.config.OAuthServerConfiguration;
 import org.wso2.carbon.identity.oauth.dao.OAuthAppDAO;
@@ -55,7 +55,6 @@ import org.wso2.carbon.user.api.UserRealm;
 import org.wso2.carbon.user.api.UserStoreException;
 import org.wso2.carbon.user.core.UserStoreManager;
 import org.wso2.carbon.user.core.service.RealmService;
-import org.wso2.carbon.user.core.util.UserCoreUtil;
 import org.wso2.carbon.utils.multitenancy.MultitenantUtils;
 
 import java.security.Key;
@@ -108,7 +107,7 @@ public class JWTTokenGenerator implements AuthorizationContextTokenGenerator {
     private ClaimCache claimsLocalCache;
 
     public JWTTokenGenerator() {
-        claimsLocalCache = ClaimCache.getInstance(OAuthServerConfiguration.getInstance().getClaimCacheTimeout());
+        claimsLocalCache = ClaimCache.getInstance();
     }
 
     private String userAttributeSeparator = IdentityCoreConstants.MULTI_ATTRIBUTE_SEPARATOR_DEFAULT;
@@ -169,8 +168,7 @@ public class JWTTokenGenerator implements AuthorizationContextTokenGenerator {
 
         RealmService realmService = OAuthComponentServiceHolder.getRealmService();
         // TODO : Need to handle situation where federated user name is similar to a one we have in our user store
-        if (realmService != null && tenantID != MultitenantConstants.INVALID_TENANT_ID &&
-                tenantID == OAuth2Util.getTenantIdFromUserName(authzUser)) {
+        if (realmService != null && tenantID != MultitenantConstants.INVALID_TENANT_ID ) {
             try {
                 UserRealm userRealm = realmService.getTenantUserRealm(tenantID);
                 if (userRealm != null) {
@@ -196,7 +194,7 @@ public class JWTTokenGenerator implements AuthorizationContextTokenGenerator {
             log.debug(e.getMessage(), e);
             throw new IdentityOAuth2Exception(e.getMessage());
         }
-        String subscriber = appDO.getUserName();
+        String subscriber = appDO.getUser().toString();
         String applicationName = appDO.getApplicationName();
 
         //generating expiring timestamp
@@ -222,8 +220,8 @@ public class JWTTokenGenerator implements AuthorizationContextTokenGenerator {
                 requestedClaims = claimsRetriever.getDefaultClaims(authzUser);
             }
 
-            CacheKey cacheKey = null;
-            Object result = null;
+            ClaimCacheKey cacheKey = null;
+            UserClaims result = null;
 
             if(requestedClaims != null) {
                 cacheKey = new ClaimCacheKey(authzUser, requestedClaims);
@@ -232,7 +230,7 @@ public class JWTTokenGenerator implements AuthorizationContextTokenGenerator {
 
             SortedMap<String,String> claimValues = null;
             if (result != null) {
-                claimValues = ((UserClaims) result).getClaimValues();
+                claimValues = result.getClaimValues();
             } else if (isExistingUser) {
                 claimValues = claimsRetriever.getClaims(authzUser, requestedClaims);
                 UserClaims userClaims = new UserClaims(claimValues);
@@ -529,7 +527,7 @@ public class JWTTokenGenerator implements AuthorizationContextTokenGenerator {
 
     private String getMultiAttributeSeparator(String authenticatedUser, int tenantId) {
         String claimSeparator = null;
-        String userDomain = UserCoreUtil.extractDomainFromName(authenticatedUser);
+        String userDomain = IdentityUtil.extractDomainFromName(authenticatedUser);
 
         try {
             RealmConfiguration realmConfiguration = null;

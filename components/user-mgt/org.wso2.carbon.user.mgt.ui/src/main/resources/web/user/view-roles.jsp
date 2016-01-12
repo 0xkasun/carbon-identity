@@ -20,6 +20,9 @@
 <%@ taglib uri="http://wso2.org/projects/carbon/taglibs/carbontags.jar" prefix="carbon" %>
 <%@ page session="true" %>
 <%@ page import="org.apache.axis2.context.ConfigurationContext" %>
+<%@ page import="org.apache.commons.collections.CollectionUtils" %>
+<%@ page import="org.apache.commons.lang.ArrayUtils" %>
+<%@ page import="org.apache.commons.lang.StringUtils" %>
 <%@ page import="org.owasp.encoder.Encode" %>
 <%@ page import="org.wso2.carbon.CarbonConstants" %>
 <%@ page import="org.wso2.carbon.ui.CarbonUIUtil" %>
@@ -28,23 +31,21 @@
 <%@ page import="org.wso2.carbon.user.mgt.ui.PaginatedNamesBean" %>
 <%@ page import="org.wso2.carbon.user.mgt.ui.UserAdminClient" %>
 <%@ page import="org.wso2.carbon.user.mgt.ui.UserAdminUIConstants" %>
+<%@ page import="org.wso2.carbon.user.mgt.ui.UserManagementWorkflowServiceClient" %>
 <%@ page import="org.wso2.carbon.user.mgt.ui.Util" %>
 <%@ page import="org.wso2.carbon.utils.ServerConstants" %>
 <%@ page import="java.text.MessageFormat" %>
 <%@ page import="java.util.ArrayList" %>
 <%@ page import="java.util.Arrays" %>
 <%@ page import="java.util.HashMap" %>
+<%@ page import="java.util.LinkedHashSet" %>
 <%@ page import="java.util.List" %>
 <%@ page import="java.util.Map" %>
 <%@ page import="java.util.ResourceBundle" %>
-<%@ page import="org.wso2.carbon.user.mgt.workflow.ui.UserManagementWorkflowServiceClient" %>
-<%@ page import="java.util.LinkedHashSet" %>
 <%@ page import="java.util.Set" %>
-<%@ page import="org.apache.commons.lang.StringUtils" %>
-<%@ page import="org.apache.commons.lang.ArrayUtils" %>
-<%@ page import="org.apache.commons.collections.CollectionUtils" %>
 <script type="text/javascript" src="../userstore/extensions/js/vui.js"></script>
 <script type="text/javascript" src="../admin/js/main.js"></script>
+<script type="text/javascript" src="../identity/validation/js/identity-validate.js"></script>
 <jsp:include page="../dialog/display_messages.jsp"/>
 <jsp:include page="../userstore/display-messages.jsp"/>
 
@@ -117,14 +118,14 @@
     }
 
     String userName = request.getParameter("username");
-    String disPlayName = request.getParameter("disPlayName");
-    if (StringUtils.isBlank(disPlayName)) {
-        disPlayName = (String) session.getAttribute(UserAdminUIConstants.USER_DISPLAY_NAME);
-        if (StringUtils.isBlank(disPlayName)) {
-            disPlayName = userName;
+    String displayName = request.getParameter("displayName");
+    if (StringUtils.isBlank(displayName)) {
+        displayName = (String) session.getAttribute(UserAdminUIConstants.USER_DISPLAY_NAME);
+        if (StringUtils.isBlank(displayName)) {
+            displayName = userName;
         }
     } else {
-        session.setAttribute(UserAdminUIConstants.USER_DISPLAY_NAME, disPlayName);
+        session.setAttribute(UserAdminUIConstants.USER_DISPLAY_NAME, displayName);
     }
     UserRealmInfo userRealmInfo = (UserRealmInfo) session.getAttribute(UserAdminUIConstants.USER_STORE_INFO);
     exceededDomains = (FlaggedName) session.getAttribute(UserAdminUIConstants.USER_LIST_ASSIGNED_ROLE_CACHE_EXCEEDED);
@@ -141,10 +142,10 @@
                     UserManagementWorkflowServiceClient(cookie, backendServerURL, configContext);
 
             if (filter.length() > 0 && userName != null) {
-                FlaggedName[] data = client.getRolesOfUser(Util.decodeHTMLCharacters(userName), filter, 0);
+                FlaggedName[] data = client.getRolesOfUser(userName, filter, 0);
                 if (CarbonUIUtil.isContextRegistered(config, "/usermgt-workflow/")) {
                     String[] DeletePendingRolesList = UserMgtClient.
-                            listAllEntityNames("DELETE_ROLE", "PENDING", "ROLE");
+                            listAllEntityNames("DELETE_ROLE", "PENDING", "ROLE", filter);
                     workFlowDeletePendingRoles = new LinkedHashSet<String>(Arrays.asList(DeletePendingRolesList));
                     String pendingStatus = "[Pending Role for Delete]";
 
@@ -192,7 +193,7 @@
             }
         } catch (Exception e) {
             String message = MessageFormat.format(resourceBundle.getString("error.while.loading.roles.of"),
-                    Util.decodeHTMLCharacters(userName), e.getMessage());
+                    userName, e.getMessage());
 %>
 <script type="text/javascript">
     jQuery(document).ready(function () {
@@ -244,6 +245,7 @@
 
         function doPaginate(page, pageNumberParameterName, pageNumber) {
             var form = document.createElement("form");
+            form.id = "paginateForm";
             form.setAttribute("method", "POST");
             form.setAttribute("action", page + "?" + pageNumberParameterName + "=" + pageNumber + "&username=" + '<%=Encode.forJavaScript(Encode.forUriComponent(userName))%>');
             var selectedRolesStr = "";
@@ -275,11 +277,12 @@
             unselectedRolesElem.setAttribute("value", unselectedRolesStr);
             form.appendChild(unselectedRolesElem);
             document.body.appendChild(form);
-            form.submit();
+            $("#paginateForm").submit();
         }
 
         function doSelectAllRetrieved() {
             var form = document.createElement("form");
+            form.id = "selectAllRetrievedForm";
             form.setAttribute("method", "POST");
             form.setAttribute("action", "view-roles.jsp?pageNumber=" + <%=pageNumber%> +"&username=" + '<%=Encode.forJavaScript(Encode.forUriComponent(userName))%>');
             var selectedRolesElem = document.createElement("input");
@@ -288,12 +291,12 @@
             selectedRolesElem.setAttribute("value", "ALL");
             form.appendChild(selectedRolesElem);
             document.body.appendChild(form);
-            form.submit();
-
+            $("#selectAllRetrievedForm").submit();
         }
 
         function doUnSelectAllRetrieved() {
             var form = document.createElement("form");
+            form.id = "unSelectAllRetrievedForm";
             form.setAttribute("method", "POST");
             form.setAttribute("action", "view-roles.jsp?pageNumber=" + <%=pageNumber%> +"&username=" + '<%=Encode.forJavaScript(Encode.forUriComponent(userName))%>');
             var unselectedRolesElem = document.createElement("input");
@@ -302,14 +305,20 @@
             unselectedRolesElem.setAttribute("value", "ALL");
             form.appendChild(unselectedRolesElem);
             document.body.appendChild(form);
-            form.submit();
+            $("#unSelectAllRetrievedForm").submit();
         }
+
+        $(document).ready(function () {
+            $('form[name=filterForm]').submit(function(){
+                return doValidateForm(this, '<fmt:message key="error.input.validation.msg"/>');
+            })
+        });
 
     </script>
 
 
     <div id="middle">
-        <h2><fmt:message key="roles.list.in.user"/> <%=Encode.forHtml(disPlayName)%>
+        <h2><fmt:message key="roles.list.in.user"/> <%=Encode.forHtml(displayName)%>
         </h2>
 
         <script type="text/javascript">
@@ -327,7 +336,8 @@
                         <td><fmt:message key="list.roles"/></td>
                         <td>
                             <input type="text" name="<%=UserAdminUIConstants.USER_LIST_VIEW_ROLE_FILTER%>"
-                                   value="<%=Encode.forHtmlAttribute(filter)%>"/>
+                                   value="<%=Encode.forHtmlAttribute(filter)%>" label="<fmt:message key="list.roles"/>"
+                                   black-list-patterns="xml-meta-exists"/>
                         </td>
                         <td>
                             <input class="button" type="submit"

@@ -58,7 +58,7 @@ import org.wso2.carbon.identity.provider.openid.OpenIDProvider;
 import org.wso2.carbon.identity.provider.openid.OpenIDRememberMeTokenManager;
 import org.wso2.carbon.identity.provider.openid.OpenIDServerConstants;
 import org.wso2.carbon.identity.provider.openid.OpenIDUtil;
-import org.wso2.carbon.identity.provider.openid.dao.OpenIDUserRPDAO;
+import org.wso2.carbon.identity.core.dao.OpenIDUserRPDAO;
 import org.wso2.carbon.identity.provider.openid.extensions.OpenIDExtension;
 import org.wso2.carbon.identity.provider.openid.handlers.OpenIDAuthenticationRequest;
 import org.wso2.carbon.identity.provider.openid.handlers.OpenIDExtensionFactory;
@@ -364,11 +364,6 @@ public class OpenIDProviderService {
 
         providerInfo.setSubDomain(domain);
         String tenantFreeUsername = MultitenantUtils.getTenantAwareUsername(userName);
-        try {
-            providerInfo.setUserExist(realm.getUserStoreManager().isExistingUser(tenantFreeUsername));
-        } catch (UserStoreException e) {
-            throw new IdentityProviderException("Error while checking if user exists", e);
-        }
 
         providerInfo.setOpenIDProviderServerUrl(OpenIDUtil.getOpenIDServerURL());
         providerInfo.setOpenID(OpenIDUtil.getOpenIDUserPattern() + "/" + tenantFreeUsername);
@@ -664,6 +659,7 @@ public class OpenIDProviderService {
             throw new IdentityProviderException("Failed to get username from OpenID " + rpdto.getOpenID(), e);
         }
         String domainName = MultitenantUtils.getDomainNameFromOpenId(rpdto.getOpenID());
+        int tenantId = IdentityTenantUtil.getTenantId(domainName);
 
         OpenIDUserRPDO rpdo = new OpenIDUserRPDO();
         OpenIDUserRPDAO dao = new OpenIDUserRPDAO();
@@ -678,8 +674,8 @@ public class OpenIDProviderService {
             byte[] digest = sha.digest((userName + ":" + rpdto.getRpUrl()).getBytes());
             rpdo.setUuid(new String(Hex.encodeHex(digest)));
 
-            dao.createOrUpdate(rpdo);
-        } catch (IdentityException | NoSuchAlgorithmException e) {
+            dao.createOrUpdate(rpdo, tenantId);
+        } catch (NoSuchAlgorithmException e) {
             throw new IdentityProviderException("Error while updating DAO for " + domainName, e);
         }
 
@@ -701,17 +697,13 @@ public class OpenIDProviderService {
             throw new IdentityProviderException("Error while getting username for OpenID " + username, e);
         }
         String domainName = MultitenantUtils.getDomainNameFromOpenId(openID);
+        int tenantId = IdentityTenantUtil.getTenantId(domainName);
 
         OpenIDUserRPDO[] rpdos = null;
-        OpenIDUserRPDAO dao;
-        try {
-            dao = new OpenIDUserRPDAO();
-            rpdos = dao.getOpenIDUserRPs(username);
-            if (rpdos == null) {
-                return new OpenIDUserRPDTO[0];
-            }
-        } catch (IdentityException e) {
-            throw new IdentityProviderException("Error while using DAO for " + domainName, e);
+        OpenIDUserRPDAO dao = new OpenIDUserRPDAO();
+        rpdos = dao.getOpenIDUserRPs(username, tenantId);
+        if (rpdos == null) {
+            return new OpenIDUserRPDTO[0];
         }
 
         OpenIDUserRPDTO[] rpdto = new OpenIDUserRPDTO[rpdos.length];
@@ -740,17 +732,13 @@ public class OpenIDProviderService {
             throw new IdentityProviderException("Failed to get username from OpenID " + openID, e);
         }
         String domainName = MultitenantUtils.getTenantDomain(userName);
+        int tenantId = IdentityTenantUtil.getTenantId(domainName);
 
         OpenIDUserRPDO rpdo = null;
-        OpenIDUserRPDAO dao;
-        try {
-            dao = new OpenIDUserRPDAO();
-            rpdo = dao.getOpenIDUserRP(userName, rpUrl);
-            if (rpdo == null) {
-                return null;
-            }
-        } catch (IdentityException e) {
-            throw new IdentityProviderException("Error while using DAO for " + domainName, e);
+        OpenIDUserRPDAO dao = new OpenIDUserRPDAO();
+        rpdo = dao.getOpenIDUserRP(userName, rpUrl, tenantId);
+        if (rpdo == null) {
+            return null;
         }
         return new OpenIDUserRPDTO(rpdo);
     }

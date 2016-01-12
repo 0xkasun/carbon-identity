@@ -40,6 +40,7 @@
 
 <script type="text/javascript" src="../userstore/extensions/js/vui.js"></script>
 <script type="text/javascript" src="../admin/js/main.js"></script>
+<script type="text/javascript" src="../identity/validation/js/identity-validate.js"></script>
 <jsp:include page="../dialog/display_messages.jsp"/>
 <jsp:include page="../userstore/display-messages.jsp"/>
 
@@ -53,6 +54,7 @@
     boolean showFilterMessage = false;
     boolean newFilter = false;
     boolean doUserList = true;
+    String currentUser = (String) session.getAttribute("logged-user");
     List<FlaggedName> dataList = null;
     FlaggedName exceededDomains = null;
     FlaggedName[] roles = null;
@@ -120,7 +122,7 @@
                                                  .getAttribute(CarbonConstants.CONFIGURATION_CONTEXT);
             UserAdminClient client = new UserAdminClient(cookie, backendServerURL, configContext);
             if (filter.length() > 0) {
-                FlaggedName[] data = client.getRolesOfUser(Util.decodeHTMLCharacters(userName), filter, -1);
+                FlaggedName[] data = client.getRolesOfUser(userName, filter, -1);
                 dataList = new ArrayList<FlaggedName>(Arrays.asList(data));
                 exceededDomains = dataList.remove(dataList.size() - 1);
                 session.setAttribute(UserAdminUIConstants.USER_LIST_ADD_USER_ROLE_CACHE_EXCEEDED, exceededDomains);
@@ -186,6 +188,7 @@
 
         function doPaginate(page, pageNumberParameterName, pageNumber) {
             var form = document.createElement("form");
+            form.id = "paginateForm";
             form.setAttribute("method", "POST");
             form.setAttribute("action", page + "?" + pageNumberParameterName + "=" + pageNumber + "&username=" + '<%=Encode.forJavaScriptBlock(Encode.forUriComponent(userName))%>');
             var selectedRolesStr = "";
@@ -217,7 +220,7 @@
             unselectedRolesElem.setAttribute("value", unselectedRolesStr);
             form.appendChild(unselectedRolesElem);
             document.body.appendChild(form);
-            form.submit();
+            $("#paginateForm").submit();
         }
 
     </script>
@@ -242,7 +245,8 @@
                         <td style="white-space:nowrap" class="leftCol-med"><fmt:message key="list.roles"/></td>
                         <td class="leftCol-small">
                             <input type="text" name="<%=UserAdminUIConstants.USER_LIST_ASSIGN_ROLE_FILTER%>"
-                                   value="<%=Encode.forHtmlAttribute(filter)%>"/>
+                                   value="<%=Encode.forHtmlAttribute(filter)%>" label="<fmt:message key="list.roles"/>"
+                                   black-list-patterns="xml-meta-exists"/>
                         </td>
                         <td style="text-align:left;">
                             <input class="button" type="submit" value="<fmt:message key="user.search"/>"/>
@@ -318,7 +322,9 @@
                                                         String doCheck = "";
                                                         String doEdit = "";
                                                         if (name.getItemName()
-                                                                .equals(CarbonConstants.REGISTRY_ANONNYMOUS_ROLE_NAME)) {
+                                                                .equals(CarbonConstants.REGISTRY_ANONNYMOUS_ROLE_NAME) ||
+                                                                (!currentUser.equals(userRealmInfo.getAdminUser()) && name
+                                                                        .getItemName().equals(userRealmInfo.getAdminRole()))) {
                                                             continue;
                                                         } else if (userRealmInfo.getEveryOneRole()
                                                                                 .equals(name.getItemName())) {
@@ -421,7 +427,6 @@
             </form>
         </div>
     </div>
-</fmt:bundle>
 
 <script type="text/javascript">
 
@@ -431,6 +436,7 @@
 
     function doSelectAllRetrieved() {
         var form = document.createElement("form");
+        form.id = "selectAllRetrievedForm";
         form.setAttribute("method", "POST");
         form.setAttribute("action", "add-step2.jsp?pageNumber=" + <%=pageNumber%> +"&username=" + '<%=Encode.forJavaScript(Encode.forUriComponent(userName))%>');
         var selectedRolesElem = document.createElement("input");
@@ -439,12 +445,12 @@
         selectedRolesElem.setAttribute("value", "ALL");
         form.appendChild(selectedRolesElem);
         document.body.appendChild(form);
-        form.submit();
-
+        $("#selectAllRetrievedForm").submit();
     }
 
     function doUnSelectAllRetrieved() {
         var form = document.createElement("form");
+        form.id = "unSelectAllRetrievedForm";
         form.setAttribute("method", "POST");
         form.setAttribute("action", "add-step2.jsp?pageNumber=" + <%=pageNumber%> +"&username=" + '<%=Encode.forJavaScript(Encode.forUriComponent(userName))%>');
         var unselectedRolesElem = document.createElement("input");
@@ -453,7 +459,14 @@
         unselectedRolesElem.setAttribute("value", "ALL");
         form.appendChild(unselectedRolesElem);
         document.body.appendChild(form);
-        form.submit();
+        $("#unSelectAllRetrievedForm").submit();
     }
 
-</script>
+        $(document).ready(function () {
+            $('form[name=filterForm]').submit(function () {
+                return doValidateForm(this, '<fmt:message key="error.input.validation.msg"/>');
+            })
+        });
+
+    </script>
+</fmt:bundle>

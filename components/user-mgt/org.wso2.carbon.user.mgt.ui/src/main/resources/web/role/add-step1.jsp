@@ -68,7 +68,7 @@
             sharedRoleEnabled = client.isSharedRolesEnabled();
         }
         roleType = request.getParameter("roleType");
-        internal = UserAdminUIConstants.INTERNAL_ROLE.equals(roleType);
+        internal = UserAdminUIConstants.INTERNAL_ROLE.equalsIgnoreCase(roleType);
         sharedRoleEnabled = sharedRoleEnabled && !internal;
 
         userRealmInfo = (UserRealmInfo) session.getAttribute(UserAdminUIConstants.USER_STORE_INFO);
@@ -87,13 +87,14 @@
         if (allUserStoreInfo != null && allUserStoreInfo.length > 0) {
             for (int i = 0; i < allUserStoreInfo.length; i++) {
                 if (allUserStoreInfo[i] != null) {
-                    if (allUserStoreInfo[i].getDomainName() != null && !allUserStoreInfo[i].getReadOnly()) {
+                    if (allUserStoreInfo[i].getDomainName() != null && allUserStoreInfo[i].getWriteGroupsEnabled()) {
                         domainNames.add(allUserStoreInfo[i].getDomainName());
                     }
                 }
             }
         }
         domainNames.add(UserAdminUIConstants.INTERNAL_DOMAIN.toUpperCase());
+        domainNames.add(UserAdminUIConstants.APPLICATION_DOMAIN);
 
         if (domainNames.size() > 0) {
             if (primaryDomainName == null) {
@@ -227,7 +228,7 @@
     </script>
 
     <div id="middle">
-        <%if (UserAdminUIConstants.INTERNAL_ROLE.equals(roleType)) {%>
+        <%if (UserAdminUIConstants.INTERNAL_ROLE.equalsIgnoreCase(roleType)) {%>
         <h2><fmt:message key="add.internal.user.role"/></h2>
         <%} else { %>
         <h2><fmt:message key="add-roles"/></h2>
@@ -272,7 +273,7 @@
                         <td class="formRaw">
                             <table class="normal">
                                 <%
-                                    if (!UserAdminUIConstants.INTERNAL_ROLE.equals(roleType) &&
+                                    if (!UserAdminUIConstants.INTERNAL_ROLE.equalsIgnoreCase(roleType) &&
                                         domainNames != null && domainNames.size() > 0) {
                                 %>
                                 <tr>
@@ -284,13 +285,13 @@
                                         %>
                                         <option selected="selected"
                                                 value="<%=Encode.forHtmlAttribute(domainName)%>">
-                                            <%=Encode.forHtmlContent(domainName)%>
+                                            <%=Encode.forHtmlContent(domainName.toUpperCase())%>
                                         </option>
                                         <%
                                         } else {
                                         %>
                                         <option value="<%=Encode.forHtmlAttribute(domainName)%>">
-                                            <%=Encode.forHtmlContent(domainName)%>
+                                            <%=Encode.forHtmlContent(domainName.toUpperCase())%>
                                         </option>
                                         <%
                                                 }
